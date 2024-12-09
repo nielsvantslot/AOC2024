@@ -8,153 +8,136 @@ dotenv.config();
 const AOC_SESSION_COOKIE = process.env.AOC_SESSION_COOKIE;
 const BASE_URL = 'https://adventofcode.com/2024/day';
 const STARTER_CODE_PATH = path.join(process.cwd(), 'template.js');
+const DAY_FOLDER_TEMPLATE = (day) => path.join(process.cwd(), `day${day.toString().padStart(2, '0')}`);
 
-/**
- * Initialize Advent of Code project for a specific day
- * @param {number} day - The day of the challenge
- */
 async function initProject(day) {
-  if (!day || day < 1 || day > 25) {
-    console.error('Invalid day. Please specify a day between 1 and 25.');
-    return;
-  }
+  if (!isValidDay(day)) return;
 
-  const dayFolder = path.join(process.cwd(), `day${day.toString().padStart(2, '0')}`);
+  const dayFolder = DAY_FOLDER_TEMPLATE(day);
 
-  // Create folder for the day
-  if (!fs.existsSync(dayFolder)) {
-    fs.mkdirSync(dayFolder, { recursive: true });
-  } else {
+  if (fs.existsSync(dayFolder)) {
     console.log(`Folder for day ${day} already exists.`);
-    return;
-  }
-
-  // Fetch assignment, input, and example data from Advent of Code
-  const assignment = await fetchAssignment(day);
-  const input = await fetchInput(day);
-  const examples = await fetchExamples(day);
-
-  if (assignment) {
-    // Write README.md
-    fs.writeFileSync(path.join(dayFolder, 'README.md'), assignment);
-    console.log(`README for day ${day} saved.`);
-  }
-
-  if (input) {
-    fs.writeFileSync(path.join(dayFolder, 'input.txt'), input);
-    console.log(`Input for day ${day} saved.`);
-  }
-
-  const fileNameTemplate = examples.length > 1 ? 'input.sample{index}.txt' : 'input.sample.txt';
-
-  examples.forEach((example, index) => {
-    const fileName = examples.length > 1 ? fileNameTemplate.replace('{index}', index + 1) : fileNameTemplate;
-    const filePath = path.join(dayFolder, fileName);
-
-    fs.writeFileSync(filePath, example);
-    console.log(`Example ${index + 1} for day ${day} saved as ${fileName}.`);
-  });
-
-  // Copy starter code
-  const partOne = path.join(dayFolder, 'partOne.js');
-  const partTwo = path.join(dayFolder, 'partTwo.js');
-  if (fs.existsSync(STARTER_CODE_PATH)) {
-    fs.copyFileSync(STARTER_CODE_PATH, partOne);
-    fs.copyFileSync(STARTER_CODE_PATH, partTwo);
-    console.log(`Starter code copied to ${dayFolder}`);
+    await handlePartTwo(day, dayFolder);
+  } else {
+    fs.mkdirSync(dayFolder, { recursive: true });
+    await handlePartOne(day, dayFolder);
   }
 
   console.log(`Project for day ${day} initialized in ${dayFolder}`);
 }
 
-/**
- * Fetch the assignment description for a specific day from Advent of Code
- * @param {number} day - The day of the challenge
- * @returns {Promise<string|null>} - The assignment description or null if failed
- */
-async function fetchAssignment(day) {
-  try {
-    const response = await fetch(`${BASE_URL}/${day}`, {
-      headers: {
-        Cookie: `session=${AOC_SESSION_COOKIE}`,
-      },
-    });
+function isValidDay(day) {
+  if (day < 1 || day > 25) {
+    console.error('Invalid day. Please specify a day between 1 and 25.');
+    return false;
+  }
+  return true;
+}
 
-    if (response.ok) {
-      const html = await response.text();
+async function handlePartOne(day, dayFolder) {
+  const [assignment, input, examples] = await Promise.all([
+    fetchAssignment(day, 1),
+    fetchInput(day),
+    fetchExamples(day, 1),
+  ]);
 
-      const match = html.match(/<article.*?>([\s\S]*?)<\/article>/);
-      if (match) {
-        const assignment = match[1]
-          .replace(/<[^>]+>/g, '') // Strip HTML tags
-          .replace(/\n\s+/g, '\n') // Normalize newlines
-          .trim();
-        return `# Advent of Code 2024 - Day ${day}\n\n${assignment}`;
-      }
-      console.error('Failed to extract assignment content.');
-      return null;
-    } else {
-      console.error(`Failed to fetch assignment for day ${day}: ${response.statusText}`);
-      return null;
-    }
-  } catch (error) {
-    console.error(`Error fetching assignment for day ${day}:`, error);
-    return null;
+  const content = `# Advent of Code - Day ${day}/${2}\n\n${assignment}`;
+  if (assignment) saveFile(path.join(dayFolder, 'README.md'), content, 'README for Part 1');
+  if (input) saveFile(path.join(dayFolder, 'input.txt'), input, 'Input for Part 1');
+
+  saveExamples(examples, dayFolder, 1);
+
+  const partOneFile = path.join(dayFolder, 'partOne.js');
+  if (fs.existsSync(STARTER_CODE_PATH)) {
+    fs.copyFileSync(STARTER_CODE_PATH, partOneFile);
+    console.log('Starter code copied for Part 1.');
   }
 }
 
-/**
- * Fetch the input for a specific day from Advent of Code
- * @param {number} day - The day of the challenge
- * @returns {Promise<string|null>} - The input data or null if failed
- */
+async function handlePartTwo(day, dayFolder) {
+  const partOneExists = fs.existsSync(path.join(dayFolder, 'partOne.js'));
+  const partTwoExists = fs.existsSync(path.join(dayFolder, 'partTwo.js'));
+  if (!partOneExists) return;
+  if (partTwoExists) return;
+
+  const [assignmentPart2, examplesPart2] = await Promise.all([
+    fetchAssignment(day, 2),
+    fetchExamples(day, 2),
+  ]);
+
+  const content = `\n\n\n# Day ${day}/${2}\n\n${assignmentPart2}`;
+  if (assignmentPart2) appendFile(path.join(dayFolder, 'README.md'), content, 'README for Part 2');
+  saveExamples(examplesPart2, dayFolder, 2);
+
+  const partTwoFile = path.join(dayFolder, 'partTwo.js');
+  if (fs.existsSync(STARTER_CODE_PATH)) {
+    fs.copyFileSync(STARTER_CODE_PATH, partTwoFile);
+    console.log('Starter code copied for Part 2.');
+  }
+}
+
+function saveFile(filePath, content, label) {
+  fs.writeFileSync(filePath, content);
+  console.log(`${label} saved.`);
+}
+
+function appendFile(filePath, content, label) {
+  fs.appendFileSync(filePath, content);
+  console.log(`${label} saved.`);
+}
+
+function saveExamples(examples, dayFolder, part) {
+  if (examples.length === 0) return;
+
+  const fileNameTemplate = examples.length > 1 ? 'input.sample{index}.txt' : 'input.sample.txt';
+  examples.forEach((example, index) => {
+    const fileName = examples.length > 1 ? fileNameTemplate.replace('{index}', index + 1) : fileNameTemplate;
+    const filePath = path.join(dayFolder, fileName);
+    fs.writeFileSync(filePath, example);
+    console.log(`Part ${part} example ${index + 1} saved as ${fileName}.`);
+  });
+}
+
+async function fetchAssignment(day, part) {
+  return fetchPageContent(day, part, (html) => {
+    const match = html.match(/<article.*?>([\s\S]*?)<\/article>/g);
+    if (!match) return null;
+
+    return match[part - 1]
+      .replace(/<[^>]+>/g, '')
+      .replace(/\n\s+/g, '\n')
+      .replace(/--- (Day \d+: [\w\s]+|Part Two) ---/g, '')
+      .trim();
+  });
+}
+
 async function fetchInput(day) {
-  try {
-    const response = await fetch(`${BASE_URL}/${day}/input`, {
-      headers: {
-        Cookie: `session=${AOC_SESSION_COOKIE}`,
-      },
-    });
-
-    if (response.ok) {
-      return await response.text();
-    } else {
-      console.error(`Failed to fetch input for day ${day}: ${response.statusText}`);
-      return null;
-    }
-  } catch (error) {
-    console.error(`Error fetching input for day ${day}:`, error);
-    return null;
-  }
+  return fetchPageContent(day, 1, (html) => html);
 }
 
-/**
- * Fetch example inputs for a specific day from Advent of Code
- * @param {number} day - The day of the challenge
- * @returns {Promise<string[]>} - An array of example inputs
- */
-async function fetchExamples(day) {
+async function fetchExamples(day, part) {
+  return fetchPageContent(day, part, (html) => {
+    const match = html.match(/<article.*?>([\s\S]*?)<\/article>/);
+    const codeBlocks = match[part - 1].match(/<code>([\s\S]*?)<\/code>/g) || [];
+    return codeBlocks
+      .map((code) => code.replace(/<\/?code>/g, '').trim())
+      .filter((content) => content.length > 10 || content.includes('\n'));
+  });
+}
+
+async function fetchPageContent(day, part, parseContent) {
   try {
     const response = await fetch(`${BASE_URL}/${day}`, {
-      headers: {
-        Cookie: `session=${AOC_SESSION_COOKIE}`,
-      },
+      headers: { Cookie: `session=${AOC_SESSION_COOKIE}` },
     });
 
-    if (response.ok) {
-      const html = await response.text();
+    if (!response.ok) throw new Error(response.statusText);
 
-      const codeBlocks = html.match(/<code>([\s\S]*?)<\/code>/g) || [];
-      return codeBlocks
-        .map(code => code.replace(/<\/?code>/g, '').trim())
-        .filter(content => content.length > 10 || content.includes('\n'));
-    } else {
-      console.error(`Failed to fetch examples for day ${day}: ${response.statusText}`);
-      return [];
-    }
+    const html = await response.text();
+    return parseContent(html);
   } catch (error) {
-    console.error(`Error fetching examples for day ${day}:`, error);
-    return [];
+    console.error(`Error fetching content for day ${day}, part ${part}:`, error);
+    return null;
   }
 }
 
