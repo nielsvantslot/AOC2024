@@ -35,44 +35,48 @@ function isValidDay(day) {
 }
 
 async function handlePartOne(day, dayFolder) {
+  const part = 1;
   const [assignment, input, examples] = await Promise.all([
-    fetchAssignment(day, 1),
+    fetchAssignment(day, part),
     fetchInput(day),
-    fetchExamples(day, 1),
+    fetchExamples(day, part),
   ]);
 
-  const content = `# Advent of Code - Day ${day}/${2}\n\n${assignment}`;
-  if (assignment) saveFile(path.join(dayFolder, 'README.md'), content, 'README for Part 1');
-  if (input) saveFile(path.join(dayFolder, 'input.txt'), input, 'Input for Part 1');
+  const content = `# Advent of Code - Day ${day}/${part}\n\n${assignment}`;
+  if (assignment) saveFile(path.join(dayFolder, 'README.md'), content, `README for Part ${part}`);
+  if (input) saveFile(path.join(dayFolder, 'input.txt'), input, `Input for Part ${part}`);
 
-  saveExamples(examples, dayFolder, 1);
+  saveExamples(examples, dayFolder, part);
 
   const partOneFile = path.join(dayFolder, 'partOne.js');
   if (fs.existsSync(STARTER_CODE_PATH)) {
     fs.copyFileSync(STARTER_CODE_PATH, partOneFile);
-    console.log('Starter code copied for Part 1.');
+    console.log(`Starter code copied for Part ${part}.`);
   }
 }
 
 async function handlePartTwo(day, dayFolder) {
+  const part = 2;
   const partOneExists = fs.existsSync(path.join(dayFolder, 'partOne.js'));
   const partTwoExists = fs.existsSync(path.join(dayFolder, 'partTwo.js'));
   if (!partOneExists) return;
   if (partTwoExists) return;
 
   const [assignmentPart2, examplesPart2] = await Promise.all([
-    fetchAssignment(day, 2),
-    fetchExamples(day, 2),
+    fetchAssignment(day, part),
+    fetchExamples(day, part),
   ]);
 
-  const content = `\n\n\n# Day ${day}/${2}\n\n${assignmentPart2}`;
-  if (assignmentPart2) appendFile(path.join(dayFolder, 'README.md'), content, 'README for Part 2');
-  saveExamples(examplesPart2, dayFolder, 2);
+  if (!assignmentPart2 || !examplesPart2) return console.log("It seems part two is not yet available");
+
+  const content = `\n\n\n# Day ${day}/${part}\n\n${assignmentPart2}`;
+  if (assignmentPart2) appendFile(path.join(dayFolder, 'README.md'), content, `README for Part ${part}`);
+  saveExamples(examplesPart2, dayFolder, part);
 
   const partTwoFile = path.join(dayFolder, 'partTwo.js');
   if (fs.existsSync(STARTER_CODE_PATH)) {
     fs.copyFileSync(STARTER_CODE_PATH, partTwoFile);
-    console.log('Starter code copied for Part 2.');
+    console.log(`Starter code copied for Part ${part}.`);
   }
 }
 
@@ -102,6 +106,7 @@ async function fetchAssignment(day, part) {
   return fetchPageContent(day, part, (html) => {
     const match = html.match(/<article.*?>([\s\S]*?)<\/article>/g);
     if (!match) return null;
+    if (!match[part - 1]) return null;
 
     return match[part - 1]
       .replace(/<[^>]+>/g, '')
