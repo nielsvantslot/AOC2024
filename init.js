@@ -117,7 +117,7 @@ async function fetchAssignment(day, part) {
 }
 
 async function fetchInput(day) {
-  return fetchPageContent(day, 1, (html) => html);
+  return fetchPageContent(`${day}/input`, 1, (html) => html);
 }
 
 async function fetchExamples(day, part) {
